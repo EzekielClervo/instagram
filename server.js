@@ -112,7 +112,7 @@ class MemStorage {
     );
   }
 
-  async createInstagramAccount(acpp;ount) {
+  async createInstagramAccount(account) {
     const id = this.accountId++;
     const now = new Date().toISOString();
     const newAccount = { ...account, id, createdAt: now, updatedAt: now };
