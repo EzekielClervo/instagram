@@ -256,9 +256,37 @@
             <div id="cookies-panel" style="display: none;">
                 <h2 class="mb-4">Instagram Cookies</h2>
                 
+                <div class="card mb-4 border-primary">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="card-title mb-0">Get Cookie from Instagram Credentials</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-info mb-3">
+                            <i class="bi bi-info-circle me-2"></i>
+                            Enter your Instagram credentials to generate a cookie that can be used for automation. 
+                            This is the recommended method as it ensures you have a fresh, valid cookie.
+                        </div>
+                        <form id="cookie-generator-form">
+                            <div class="mb-3">
+                                <label for="cookie-email" class="form-label">Instagram Email/Username</label>
+                                <input type="text" class="form-control" id="cookie-email" placeholder="Your Instagram username or email" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="cookie-password" class="form-label">Instagram Password</label>
+                                <input type="password" class="form-control" id="cookie-password" placeholder="Your Instagram password" required>
+                                <small class="text-muted">Your credentials are secure and only used to generate the cookie.</small>
+                            </div>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-cookie me-1"></i> Generate Cookie
+                            </button>
+                            <div class="mt-3" id="cookie-result"></div>
+                        </form>
+                    </div>
+                </div>
+                
                 <div class="card mb-4">
                     <div class="card-body">
-                        <h5 class="card-title">Add New Cookie</h5>
+                        <h5 class="card-title">Add Cookie Manually</h5>
                         <form id="add-cookie-form">
                             <div class="mb-3">
                                 <label for="cookie-account" class="form-label">Account</label>
@@ -320,6 +348,8 @@
         const registerForm = document.getElementById('register-form');
         const loginError = document.getElementById('login-error');
         const registerError = document.getElementById('register-error');
+        const cookieGeneratorForm = document.getElementById('cookie-generator-form');
+        const cookieResult = document.getElementById('cookie-result');
 
         // Dashboard Panels
         const dashboardPanel = document.getElementById('dashboard-panel');
@@ -544,6 +574,8 @@
             const email = document.getElementById('account-email').value;
             const password = document.getElementById('account-password').value;
             
+            console.log('Submitting account with email:', email);
+            
             try {
                 const response = await fetch('/api/instagram/accounts', {
                     method: 'POST',
@@ -551,18 +583,79 @@
                     body: JSON.stringify({ email, password })
                 });
                 
+                const responseData = await response.json();
+                console.log('Server response:', response.status, responseData);
+                
                 if (response.ok) {
                     addAccountResult.innerHTML = '<div class="alert alert-success">Account added successfully</div>';
                     document.getElementById('account-email').value = '';
                     document.getElementById('account-password').value = '';
                     loadAccounts();
                 } else {
-                    const error = await response.json();
-                    addAccountResult.innerHTML = `<div class="alert alert-danger">${error.message || 'Failed to add account'}</div>`;
+                    let errorMsg = responseData.message || 'Failed to add account';
+                    if (responseData.error) {
+                        errorMsg += `: ${responseData.error}`;
+                    }
+                    addAccountResult.innerHTML = `<div class="alert alert-danger">${errorMsg}</div>`;
+                    console.error('Error details:', responseData);
                 }
             } catch (error) {
                 console.error('Add account error:', error);
                 addAccountResult.innerHTML = '<div class="alert alert-danger">Network error. Please try again.</div>';
+            }
+        });
+
+        // Get Cookie from Credentials
+        cookieGeneratorForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            cookieResult.innerHTML = '<div class="alert alert-info">Getting cookie from Instagram...</div>';
+            
+            const email = document.getElementById('cookie-email').value;
+            const password = document.getElementById('cookie-password').value;
+            
+            console.log('Getting cookie for email:', email);
+            
+            if (!email || !password) {
+                cookieResult.innerHTML = '<div class="alert alert-danger">Email and password are required</div>';
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/instagram/get-cookie', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+                
+                const responseData = await response.json();
+                console.log('Server response (get cookie):', response.status, responseData);
+                
+                if (responseData.success) {
+                    cookieResult.innerHTML = `
+                        <div class="alert alert-success">
+                            <p>Successfully generated cookie!</p>
+                            <p>Cookie length: ${responseData.cookieLength} characters</p>
+                            <p>${responseData.message}</p>
+                            <div class="mt-3">
+                                <p><strong>Generated Cookie:</strong></p>
+                                <textarea class="form-control" rows="5" readonly>${responseData.cookie || "Cookie content hidden for security"}</textarea>
+                                <small class="text-muted">You can copy this cookie value and use it directly in your automation scripts.</small>
+                                <div class="mt-2">
+                                    <button class="btn btn-sm btn-secondary" onclick="copyToClipboard('${responseData.cookie.replace(/'/g, "\\'")}')">Copy to Clipboard</button>
+                                    <span id="copy-feedback" style="display:none;" class="ms-2 text-success">Copied!</span>
+                                </div>
+                            </div>
+                        </div>`;
+                    document.getElementById('cookie-email').value = '';
+                    document.getElementById('cookie-password').value = '';
+                } else {
+                    let errorMsg = responseData.message || 'Failed to get cookie';
+                    cookieResult.innerHTML = `<div class="alert alert-danger">${errorMsg}</div>`;
+                    console.error('Error details:', responseData);
+                }
+            } catch (error) {
+                console.error('Get cookie error:', error);
+                cookieResult.innerHTML = '<div class="alert alert-danger">Network error. Please try again.</div>';
             }
         });
 
@@ -574,20 +667,45 @@
             const accountId = document.getElementById('cookie-account').value;
             const cookieValue = document.getElementById('cookie-value').value;
             
+            console.log('Submitting cookie for accountId:', accountId);
+            console.log('Cookie value length:', cookieValue.length);
+            
+            if (!accountId || accountId === '') {
+                addCookieResult.innerHTML = '<div class="alert alert-danger">Please select an account</div>';
+                return;
+            }
+            
+            if (!cookieValue || cookieValue.trim() === '') {
+                addCookieResult.innerHTML = '<div class="alert alert-danger">Cookie value cannot be empty</div>';
+                return;
+            }
+            
             try {
                 const response = await fetch('/api/instagram/cookies', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ accountId, cookieValue })
+                    body: JSON.stringify({ 
+                        accountId: parseInt(accountId), 
+                        cookieValue 
+                    })
                 });
+                
+                const responseData = await response.json();
+                console.log('Server response (cookie):', response.status, responseData);
                 
                 if (response.ok) {
                     addCookieResult.innerHTML = '<div class="alert alert-success">Cookie added successfully</div>';
                     document.getElementById('cookie-value').value = '';
                     loadCookies();
+                    // Update the dropdown in case any new accounts were added
+                    updateCookieAccountsDropdown();
                 } else {
-                    const error = await response.json();
-                    addCookieResult.innerHTML = `<div class="alert alert-danger">${error.message || 'Failed to add cookie'}</div>`;
+                    let errorMsg = responseData.message || 'Failed to add cookie';
+                    if (responseData.error) {
+                        errorMsg += `: ${responseData.error}`;
+                    }
+                    addCookieResult.innerHTML = `<div class="alert alert-danger">${errorMsg}</div>`;
+                    console.error('Error details:', responseData);
                 }
             } catch (error) {
                 console.error('Add cookie error:', error);
@@ -737,12 +855,25 @@
                 
                 html += `
                 <div class="card mb-2">
-                    <div class="card-body d-flex justify-content-between align-items-center">
-                        <div>
-                            <div><strong>Account: ${accountName}</strong></div>
-                            <div class="text-muted">Created: ${new Date(cookie.createdAt).toLocaleString()}</div>
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <div>
+                                <div><strong>Account: ${accountName}</strong></div>
+                                <div class="text-muted">Created: ${new Date(cookie.createdAt).toLocaleString()}</div>
+                            </div>
+                            <button class="btn btn-sm btn-danger" onclick="deleteCookie(${cookie.id})">Delete</button>
                         </div>
-                        <button class="btn btn-sm btn-danger" onclick="deleteCookie(${cookie.id})">Delete</button>
+                        <div class="mt-2">
+                            <p class="mb-1"><small>Cookie Value (first 50 chars):</small></p>
+                            <div class="input-group">
+                                <input type="text" class="form-control form-control-sm" value="${cookie.cookieValue.substring(0, 50)}..." readonly>
+                                <button class="btn btn-sm btn-outline-secondary" 
+                                        onclick="copyToClipboard('${cookie.cookieValue.replace(/'/g, "\\'")}'); this.nextElementSibling.style.display='inline'; setTimeout(() => { this.nextElementSibling.style.display='none'; }, 2000);">
+                                    Copy
+                                </button>
+                                <span class="ms-2 text-success" style="display:none; line-height: 31px;">Copied!</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 `;
@@ -873,10 +1004,30 @@
             item.classList.add('active');
         }
 
+        // Clipboard functionality
+        function copyToClipboard(text) {
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+            
+            // Show feedback
+            const feedback = document.getElementById('copy-feedback');
+            if (feedback) {
+                feedback.style.display = 'inline';
+                setTimeout(() => {
+                    feedback.style.display = 'none';
+                }, 2000);
+            }
+        }
+        
         // Global functions (for onclick)
         window.deleteAccount = deleteAccount;
         window.deleteCookie = deleteCookie;
         window.deleteUser = deleteUser;
+        window.copyToClipboard = copyToClipboard;
 
         // Initialize
         checkAuth();
