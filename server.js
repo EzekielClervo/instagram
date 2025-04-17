@@ -321,7 +321,30 @@ app.get("/api/instagram/accounts", isAuthenticated, async (req, res) => {
 
 app.post("/api/instagram/accounts", isAuthenticated, async (req, res) => {
   try {
+    console.log("Creating Instagram account, req.body:", req.body);
+    console.log("User ID:", req.user.id);
+    
     const { email, password } = req.body;
+    
+    if (!email || !password) {
+      return res.status(400).json({ message: "Email and password are required" });
+    }
+    
+    // First attempt to get a cookie using the credentials
+    const igAutomation = require('./instagram-automation');
+    const cookieResult = await igAutomation.getCookieFromCredentials(email, password);
+    
+    if (!cookieResult.success) {
+      console.error("Failed to get Instagram cookie:", cookieResult.message);
+      return res.status(400).json({ 
+        message: "Failed to authenticate with Instagram", 
+        error: cookieResult.message 
+      });
+    }
+    
+    console.log("Successfully got Instagram cookie");
+    
+    // Create the account
     const account = await storage.createInstagramAccount({
       userId: req.user.id,
       email,
@@ -329,8 +352,21 @@ app.post("/api/instagram/accounts", isAuthenticated, async (req, res) => {
       username: email.split('@')[0],
       active: true,
     });
+    
+    console.log("Account created successfully:", account);
+    
+    // Create a cookie record associated with this account
+    await storage.createCookie({
+      accountId: account.id,
+      cookieValue: cookieResult.cookie,
+      active: true,
+    });
+    
+    console.log("Cookie saved successfully for account ID:", account.id);
+    
     res.status(201).json(account);
   } catch (error) {
+    console.error("Error creating Instagram account:", error);
     res.status(500).json({ message: "Error creating account", error: error.message });
   }
 });
@@ -363,22 +399,43 @@ app.get("/api/instagram/cookies", isAuthenticated, async (req, res) => {
 
 app.post("/api/instagram/cookies", isAuthenticated, async (req, res) => {
   try {
+    console.log("Creating cookie, req.body:", req.body);
+    
     const { accountId, cookieValue } = req.body;
     
+    if (!accountId) {
+      return res.status(400).json({ message: "Account ID is required" });
+    }
+    
+    if (!cookieValue || cookieValue.trim() === '') {
+      return res.status(400).json({ message: "Cookie value is required" });
+    }
+    
+    // Parse accountId as integer if it's a string
+    const parsedAccountId = typeof accountId === 'string' ? parseInt(accountId) : accountId;
+    
     // Check if the account belongs to the current user
-    const account = await storage.getInstagramAccount(parseInt(accountId));
-    if (!account || account.userId !== req.user.id) {
+    const account = await storage.getInstagramAccount(parsedAccountId);
+    console.log("Found account:", account);
+    
+    if (!account) {
       return res.status(404).json({ message: "Account not found" });
     }
     
+    if (account.userId !== req.user.id) {
+      return res.status(403).json({ message: "You don't have permission to add cookies to this account" });
+    }
+    
     const cookie = await storage.createCookie({
-      accountId: parseInt(accountId),
+      accountId: parsedAccountId,
       cookieValue,
       active: true,
     });
     
+    console.log("Cookie created successfully:", cookie);
     res.status(201).json(cookie);
   } catch (error) {
+    console.error("Error creating cookie:", error);
     res.status(500).json({ message: "Error creating cookie", error: error.message });
   }
 });
@@ -413,6 +470,40 @@ app.get("/api/activity-logs", isAuthenticated, async (req, res) => {
     res.json(logs);
   } catch (error) {
     res.status(500).json({ message: "Error fetching activity logs", error: error.message });
+  }
+});
+
+// Get Cookie Directly
+app.post("/api/instagram/get-cookie", isAuthenticated, async (req, res) => {
+  try {
+    console.log("Getting cookie directly, req.body:", req.body);
+    
+    const { email, password } = req.body;
+    
+    if (!email || !password) {
+      return res.status(400).json({ message: "Email and password are required" });
+    }
+    
+    const igAutomation = require('./instagram-automation');
+    const result = await igAutomation.getCookieFromCredentials(email, password);
+    
+    if (result.success) {
+      // Include the actual cookie value in the response so the client can display it
+      res.json({
+        success: true,
+        message: result.message,
+        cookieLength: result.cookie.length,
+        cookie: result.cookie
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        message: result.message
+      });
+    }
+  } catch (error) {
+    console.error("Error getting cookie:", error);
+    res.status(500).json({ message: "Error getting cookie", error: error.message });
   }
 });
 
@@ -471,7 +562,7 @@ const PORT = process.env.PORT || 3000;
 const server = http.createServer(app);
 
 server.listen(PORT, () => {
-  console.log(`Serrunningning on port ${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });
 
 module.exports = app;
