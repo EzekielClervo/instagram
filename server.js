@@ -113,7 +113,7 @@ class MemStorage {
   }
 
   async createInstagramAccount(account) {
-    const id = this.accountId++;
+    const appppd = this.accountId++;
     const now = new Date().toISOString();
     const newAccount = { ...account, id, createdAt: now, updatedAt: now };
     this.instagramAccounts.set(id, newAccount);
@@ -449,14 +449,13 @@ app.delete("/api/admin/users/:id", isAdmin, async (req, res) => {
   }
 });
 
-// Serve static files in production
-if (process.env.NODE_ENV === 'production') {
-  app.use(express.static(path.join(__dirname, 'client/dist')));
-  
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'client/dist/index.html'));
-  });
-}
+// Serve static files always (not just in production)
+app.use(express.static(path.join(__dirname, 'client/dist')));
+
+// Handle all other routes by serving the index.html file
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'client/dist/index.html'));
+});
 
 // Error handler
 app.use((err, req, res, next) => {
@@ -472,7 +471,7 @@ const PORT = process.env.PORT || 3000;
 const server = http.createServer(app);
 
 server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`Serrunningning on port ${PORT}`);
 });
 
 module.exports = app;
