@@ -1,0 +1,24 @@
+{
+  "name": "instagram-automation-tool",
+  "version": "1.0.0",
+  "description": "JavaScript-based Instagram automation tool with user authentication",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js"
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "express": "^4.18.2",
+    "express-session": "^1.17.3",
+    "memorystore": "^1.6.7",
+    "passport": "^0.6.0",
+    "passport-local": "^1.0.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}
